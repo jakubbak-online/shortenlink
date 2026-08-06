@@ -1,0 +1,100 @@
+:root {
+    --bg: #f7f7f8;
+    --text: #1b1b1f;
+    --muted: #666;
+    --accent: #2f6feb;
+    --border: #ddd;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.5;
+}
+
+.site-header {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    background: #fff;
+}
+
+.logo {
+    font-weight: 700;
+    text-decoration: none;
+    color: var(--text);
+}
+
+main {
+    max-width: 480px;
+    margin: 3rem auto;
+    padding: 0 1.5rem;
+}
+
+.hero h1 {
+    margin-bottom: 0.25rem;
+}
+
+.lead {
+    color: var(--muted);
+    margin-top: 0;
+}
+
+.link-form p {
+    margin: 0 0 1rem;
+}
+
+.link-form input {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 1rem;
+}
+
+.link-form label {
+    display: block;
+    margin-bottom: 0.3rem;
+    font-size: 0.9rem;
+    color: var(--muted);
+}
+
+button {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 0.6rem 1.2rem;
+    border-radius: 6px;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+button:hover {
+    opacity: 0.9;
+}
+
+.result {
+    background: #eaf1ff;
+    border: 1px solid #cddcfb;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.result-link {
+    font-weight: 600;
+    color: var(--accent);
+    word-break: break-all;
+}
+
+.site-footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.85rem;
+    padding: 2rem 1rem;
+}

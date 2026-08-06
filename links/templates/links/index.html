@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}shortenlink — skróć link{% endblock %}
+
+{% block content %}
+    <section class="hero">
+        <h1>Skróć link</h1>
+        <p class="lead">Wklej długi adres, dostaniesz krótki. Kliknięcie od razu przekierowuje.</p>
+    </section>
+
+    {% if short_link %}
+        <div class="result">
+            <p>Gotowe:</p>
+            <a href="{{ short_link }}" class="result-link">{{ short_link }}</a>
+        </div>
+    {% endif %}
+
+    <form method="post" class="link-form">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Skróć</button>
+    </form>
+{% endblock %}
