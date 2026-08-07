@@ -1,0 +1,5 @@
+# Skrypty odpalane w kontenerze (Linux) muszą mieć LF. Bez tego Git na
+# Windowsie (autocrlf=true) podmienia je w working tree na CRLF, a wtedy
+# `sh` w kontenerze wywala się na "$'\r': command not found" — mimo że
+# sam plik w repo ma poprawne LF.
+*.sh text eol=lf

@@ -14,3 +14,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
+
+# "sh entrypoint.sh", nie "./entrypoint.sh" — web montuje cały katalog
+# projektu (volumes: .:/app), więc w kontenerze liczy się prawo wykonania
+# pliku z hosta, a na Windowsie bind mount go nie gwarantuje. Wywołanie
+# przez sh nie wymaga bitu +x.
+ENTRYPOINT ["sh", "entrypoint.sh"]
