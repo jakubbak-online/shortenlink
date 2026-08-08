@@ -12,6 +12,7 @@
         <div class="result">
             <p>Gotowe:</p>
             <a href="{{ short_link }}" class="result-link">{{ short_link }}</a>
+            <p class="stats-hint"><a href="{% url 'links:stats' short_code %}">zobacz statystyki</a></p>
         </div>
     {% endif %}
 

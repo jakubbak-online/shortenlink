@@ -116,3 +116,16 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# Analityka kliknięć (links/services.py)
+
+# Sól do haszowania IP przed zapisem w ClickEvent — musi być stała w
+# czasie (inaczej ten sam odwiedzający liczy się jako inny po restarcie),
+# ale nigdy nie w repo.
+IP_SALT = config('IP_SALT')
+
+# Baza MaxMind GeoLite2 (plik .mmdb) do lookupu kraju z IP. Wymaga
+# darmowego konta na maxmind.com i osobnego pobrania — nie ma jej w repo.
+# Dopóki pliku nie ma na dysku, lookup_country() po prostu zwraca "".
+GEOIP_DB_PATH = config('GEOIP_DB_PATH', default=str(BASE_DIR / 'geoip' / 'GeoLite2-Country.mmdb'))

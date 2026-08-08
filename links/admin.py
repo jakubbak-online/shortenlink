@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from links.models import Link
+from links.models import ClickEvent, Link
 
 
 @admin.register(Link)
@@ -9,3 +9,10 @@ class LinkAdmin(admin.ModelAdmin):
     list_filter = ("is_active",)
     search_fields = ("code", "target_url", "title")
     readonly_fields = ("created_at",)
+
+
+@admin.register(ClickEvent)
+class ClickEventAdmin(admin.ModelAdmin):
+    list_display = ("link", "created_at", "device_type", "country", "referer_domain")
+    list_filter = ("device_type", "country")
+    readonly_fields = ("link", "created_at", "ip_hash", "country", "referer_domain", "device_type", "browser", "os")

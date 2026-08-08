@@ -13,10 +13,12 @@ env/
 # Django
 *.log
 local_settings.py
-db.sqlite3
-db.sqlite3-3
+*.sqlite3
 media/
 staticfiles/
+
+# Baza MaxMind GeoLite2 - wymaga własnego konta, nie wchodzi do repo
+geoip/
 
 # Env vars / secrets
 .env

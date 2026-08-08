@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Statystyki {{ link.code }} — shortenlink{% endblock %}
+
+{% block content %}
+    <section class="hero">
+        <h1>Statystyki: {{ link.code }}</h1>
+        <p class="lead">{{ link.target_url }}</p>
+    </section>
+
+    <p class="total-clicks">Kliknięcia łącznie: <strong>{{ total_clicks }}</strong></p>
+
+    {% if recent_events %}
+        <div class="table-scroll">
+            <table class="events-table">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Urządzenie</th>
+                        <th>Przeglądarka</th>
+                        <th>System</th>
+                        <th>Kraj</th>
+                        <th>Skąd</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for event in recent_events %}
+                        <tr>
+                            <td>{{ event.created_at|date:"Y-m-d H:i" }}</td>
+                            <td>{{ event.device_type }}</td>
+                            <td>{{ event.browser|default:"—" }}</td>
+                            <td>{{ event.os|default:"—" }}</td>
+                            <td>{{ event.country|default:"—" }}</td>
+                            <td>{{ event.referer_domain|default:"bezpośrednio" }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p>Jeszcze żadnych kliknięć.</p>
+    {% endif %}
+{% endblock %}
