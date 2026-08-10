@@ -18,9 +18,25 @@ services:
   web:
     build: .
     command: python manage.py runserver 0.0.0.0:8000
+    environment:
+      RUN_MIGRATIONS: "1"
     env_file: .env
     volumes: [.:/app]
     ports: ["8000:8000"]
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_started}
+
+  worker:
+    build: .
+    # Bez limitu Celery domyślnie odpala tyle procesów, ile rdzeni ma
+    # host (na deweloperskiej maszynie: 12) - do skali tego projektu to
+    # przesada, a przy benchmarku lokalnym (Locust też na hoście, nie w
+    # kontenerze) taki worker zaczyna konkurować o CPU z resztą stacku i
+    # zniekształca pomiar.
+    command: celery -A config worker --loglevel=info --concurrency=4
+    env_file: .env
+    volumes: [.:/app]
     depends_on:
       db: {condition: service_healthy}
       redis: {condition: service_started}

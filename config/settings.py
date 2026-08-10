@@ -2,6 +2,7 @@
 Django settings for config project.
 """
 
+import sys
 from pathlib import Path
 
 from decouple import Csv, config
@@ -129,3 +130,29 @@ IP_SALT = config('IP_SALT')
 # darmowego konta na maxmind.com i osobnego pobrania — nie ma jej w repo.
 # Dopóki pliku nie ma na dysku, lookup_country() po prostu zwraca "".
 GEOIP_DB_PATH = config('GEOIP_DB_PATH', default=str(BASE_DIR / 'geoip' / 'GeoLite2-Country.mmdb'))
+
+
+# Cache (ścieżka przekierowania) i Celery (kolejka zapisu kliknięć) —
+# oba na Redisie, ale na osobnych bazach logicznych (0 i 1), żeby np.
+# ręczny FLUSHDB na cache nie ruszał kolejki zadań.
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': config('REDIS_URL', default='redis://redis:6379/0'),
+    }
+}
+
+CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://redis:6379/1')
+# Zadania odpalone z .delay() to fire-and-forget (widok nie czeka na
+# wynik) — nie ma czego przechowywać jako wynik zadania.
+CELERY_RESULT_BACKEND = None
+CELERY_TIMEZONE = TIME_ZONE
+
+# manage.py test odpala zadania Celery synchronicznie, w tym samym
+# procesie, zamiast wysyłać je do brokera — inaczej testy sprawdzające
+# efekt record_click_task musiałyby czekać na osobno stojącego workera.
+# CELERY_TASK_EAGER_PROPAGATES sprawia, że wyjątek z zadania wyleci do
+# testu zamiast zniknąć w logu workera.
+CELERY_TASK_ALWAYS_EAGER = 'test' in sys.argv
+CELERY_TASK_EAGER_PROPAGATES = True
