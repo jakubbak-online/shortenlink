@@ -101,6 +101,18 @@ button:hover {
     font-size: 0.9rem;
 }
 
+.form-error,
+.errorlist {
+    color: #c0392b;
+    font-size: 0.9rem;
+    margin: 0 0 1rem;
+    padding-left: 1.1rem;
+}
+
+.form-error {
+    padding-left: 0;
+}
+
 .total-clicks {
     font-size: 1.1rem;
 }

@@ -7,12 +7,14 @@ można to samo bez zmian wywołać z zadania w tle.
 """
 
 import hashlib
+import re
 import secrets
 from functools import lru_cache
 from urllib.parse import urlparse
 
 import user_agents
 from django.conf import settings
+from django.contrib.auth.hashers import make_password
 from django.db import IntegrityError, transaction
 from geoip2.database import Reader
 from geoip2.errors import AddressNotFoundError
@@ -23,31 +25,72 @@ ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 CODE_LENGTH = 6
 MAX_GENERATE_ATTEMPTS = 5
 
-# Słowa, których nie może zająć wygenerowany ani (później) własny kod —
-# kolidowałyby z resztą routingu (/admin/, /api/...). Na razie egzekwowane
-# tylko przy generowaniu losowym; przy własnych kodach (etap 4) dojdzie
-# walidacja formularza korzystająca z tej samej stałej.
+# Słowa, których nie może zająć wygenerowany ani własny kod — kolidowałyby
+# z resztą routingu (/admin/, /api/...).
 RESERVED_CODES = {
     "admin", "api", "static", "media",
     "login", "logout", "register", "docs",
 }
+
+# Własny kod jest luźniejszy niż losowy (dopuszcza myślnik/podkreślnik,
+# zmienną długość — to ma być coś zapamiętywalnego typu "moja-promocja"),
+# ale wciąż ograniczony do max_length pola Link.code (16 znaków).
+CUSTOM_CODE_MIN_LENGTH = 3
+CUSTOM_CODE_MAX_LENGTH = 16
+CUSTOM_CODE_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
 def generate_code(length: int = CODE_LENGTH) -> str:
     return "".join(secrets.choice(ALPHABET) for _ in range(length))
 
 
-def create_link(*, owner, target_url: str, **kwargs) -> Link:
-    """Tworzy Link z losowym, unikalnym kodem.
+def validate_custom_code(code: str) -> None:
+    """Rzuca ValueError, jeśli kod się nie nadaje na własny — format albo
+    zastrzeżone słowo. Zajętość (unikalność w bazie) to osobna sprawa,
+    rozstrzygana dopiero przez create_link przy zapisie, nie tutaj.
 
-    Nie sprawdzamy najpierw, czy kod jest wolny — dwa równoległe żądania
-    mogłyby zobaczyć ten sam wolny kod. Zamiast tego próbujemy zapisać i
-    reagujemy na IntegrityError z unikalnego indeksu, które jedyne potrafi
-    to rozstrzygnąć atomowo.
+    Wołane i z formularza (LinkForm.clean_custom_code — szybki feedback
+    dla użytkownika), i z create_link (serwis nie ufa ślepo formularzowi,
+    to samo API może kiedyś wołać coś innego niż ten formularz)."""
+    if not CUSTOM_CODE_PATTERN.match(code):
+        raise ValueError("Kod może zawierać tylko litery, cyfry, myślnik i podkreślnik")
+    if not (CUSTOM_CODE_MIN_LENGTH <= len(code) <= CUSTOM_CODE_MAX_LENGTH):
+        raise ValueError(f"Kod musi mieć od {CUSTOM_CODE_MIN_LENGTH} do {CUSTOM_CODE_MAX_LENGTH} znaków")
+    if code.lower() in RESERVED_CODES:
+        raise ValueError("Ten kod jest zastrzeżony")
+
+
+def create_link(*, owner, target_url: str, code: str | None = None, password: str = "", **kwargs) -> Link:
+    """Tworzy Link. Bez `code` losuje unikalny kod (patrz niżej), z `code`
+    próbuje zapisać dokładnie ten jeden, podany przez użytkownika.
+
+    Przy losowaniu nie sprawdzamy najpierw, czy kod jest wolny — dwa
+    równoległe żądania mogłyby zobaczyć ten sam wolny kod. Zamiast tego
+    próbujemy zapisać i reagujemy na IntegrityError z unikalnego indeksu,
+    które jedyne potrafi to rozstrzygnąć atomowo. Przy własnym kodzie ten
+    sam mechanizm daje darmową ochronę przed wyścigiem na tym samym
+    wpisanym ręcznie kodzie — tylko bez pętli ponawiania (nie ma czego
+    losować drugi raz), kolizja od razu wraca jako błąd do formularza.
     """
+    password_hash = make_password(password) if password else ""
+
+    if code is not None:
+        validate_custom_code(code)
+        try:
+            with transaction.atomic():
+                return Link.objects.create(
+                    owner=owner,
+                    target_url=target_url,
+                    code=code,
+                    password_hash=password_hash,
+                    **kwargs,
+                )
+        except IntegrityError:
+            raise ValueError("Ten kod jest już zajęty")
+
     for _ in range(MAX_GENERATE_ATTEMPTS):
-        code = generate_code()
-        if code.lower() in RESERVED_CODES:
+        generated = generate_code()
+        if generated.lower() in RESERVED_CODES:
             continue
         try:
             # atomic() daje savepoint na próbę — bez tego IntegrityError
@@ -58,7 +101,8 @@ def create_link(*, owner, target_url: str, **kwargs) -> Link:
                 return Link.objects.create(
                     owner=owner,
                     target_url=target_url,
-                    code=code,
+                    code=generated,
+                    password_hash=password_hash,
                     **kwargs,
                 )
         except IntegrityError:

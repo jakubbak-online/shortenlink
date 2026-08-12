@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.contrib.auth.hashers import make_password
 from django.core.cache import cache
 from django.test import TestCase
 from django.urls import reverse
@@ -133,6 +134,59 @@ class RedirectViewCacheTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
 
+class RedirectViewPasswordTests(TestCase):
+    def setUp(self):
+        cache.clear()
+
+    def test_link_z_haslem_pokazuje_formularz_zamiast_przekierowania(self):
+        Link.objects.create(
+            code="haslo1",
+            target_url="https://example.com/cel",
+            password_hash=make_password("sezam"),
+        )
+
+        response = self.client.get(reverse("links:redirect", args=["haslo1"]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "hasłem")
+
+    def test_niepoprawne_haslo_nie_przekierowuje_i_nie_liczy_klikniecia(self):
+        Link.objects.create(
+            code="haslo2",
+            target_url="https://example.com/cel",
+            password_hash=make_password("sezam"),
+        )
+
+        response = self.client.post(
+            reverse("links:redirect", args=["haslo2"]), {"password": "zle-haslo"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(ClickEvent.objects.count(), 0)
+
+    def test_poprawne_haslo_przekierowuje_i_liczy_klikniecie(self):
+        Link.objects.create(
+            code="haslo3",
+            target_url="https://example.com/cel",
+            password_hash=make_password("sezam"),
+        )
+
+        response = self.client.post(
+            reverse("links:redirect", args=["haslo3"]), {"password": "sezam"}
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "https://example.com/cel")
+        self.assertEqual(ClickEvent.objects.count(), 1)
+
+    def test_link_bez_hasla_przekierowuje_od_razu(self):
+        Link.objects.create(code="bezhasla", target_url="https://example.com/cel")
+
+        response = self.client.get(reverse("links:redirect", args=["bezhasla"]))
+
+        self.assertEqual(response.status_code, 302)
+
+
 class CreateLinkViewTests(TestCase):
     def test_formularz_tworzy_link_i_pokazuje_krotki_adres(self):
         response = self.client.post(
@@ -145,6 +199,29 @@ class CreateLinkViewTests(TestCase):
         link = Link.objects.get()
         self.assertIsNone(link.owner)
         self.assertContains(response, f"/{link.code}/")
+
+    def test_wlasny_kod_trafia_do_utworzonego_linku(self):
+        response = self.client.post(
+            reverse("links:create"),
+            {"target_url": "https://example.com/dlugi-adres", "title": "", "custom_code": "moj-link"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        link = Link.objects.get()
+        self.assertEqual(link.code, "moj-link")
+        self.assertContains(response, "/moj-link/")
+
+    def test_zajety_wlasny_kod_pokazuje_blad_formularza_zamiast_500(self):
+        Link.objects.create(code="zajety-kod", target_url="https://inny.example")
+
+        response = self.client.post(
+            reverse("links:create"),
+            {"target_url": "https://example.com/dlugi-adres", "title": "", "custom_code": "zajety-kod"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "zajęty")
+        self.assertEqual(Link.objects.count(), 1)
 
 
 class StatsViewTests(TestCase):

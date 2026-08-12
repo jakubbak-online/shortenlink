@@ -1,3 +1,4 @@
+from django.contrib.auth.hashers import check_password
 from django.core.cache import cache
 from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import render
@@ -23,14 +24,25 @@ def create_link_view(request):
         form = LinkForm(request.POST)
         if form.is_valid():
             owner = request.user if request.user.is_authenticated else None
-            link = create_link(
-                owner=owner,
-                target_url=form.cleaned_data["target_url"],
-                title=form.cleaned_data["title"],
-            )
-            short_link = request.build_absolute_uri(f"/{link.code}/")
-            short_code = link.code
-            form = LinkForm()
+            try:
+                link = create_link(
+                    owner=owner,
+                    target_url=form.cleaned_data["target_url"],
+                    title=form.cleaned_data["title"],
+                    code=form.cleaned_data["custom_code"] or None,
+                    password=form.cleaned_data["password"],
+                    expires_at=form.cleaned_data["expires_at"],
+                    max_clicks=form.cleaned_data["max_clicks"],
+                )
+            except ValueError as exc:
+                # Kolizja własnego kodu wykryta dopiero przy zapisie
+                # (unikalny indeks) - clean_custom_code złapał już format
+                # i zastrzeżone słowa wcześniej, to tylko zajętość.
+                form.add_error("custom_code", str(exc))
+            else:
+                short_link = request.build_absolute_uri(f"/{link.code}/")
+                short_code = link.code
+                form = LinkForm()
     else:
         form = LinkForm()
 
@@ -43,10 +55,11 @@ def redirect_view(request, code):
     projekt.
 
     Kolejność: cache Redis (`link:{code}`) → miss: Postgres + zapis do
-    cache'u → sprawdzenie is_active/expires_at/max_clicks (limit liczony
-    INCR-em w Redisie, nie COUNT(*) na ClickEvent — to policzenie byłoby
-    dokładnie tym wolnym zapytaniem na krytycznej ścieżce, którego cały
-    ten projekt ma unikać) → zapis kliknięcia w tle przez Celery (nie
+    cache'u → sprawdzenie is_active/expires_at → (jeśli jest hasło:
+    formularz, dalej dopiero po poprawnym haśle) → max_clicks (limit
+    liczony INCR-em w Redisie, nie COUNT(*) na ClickEvent — to policzenie
+    byłoby dokładnie tym wolnym zapytaniem na krytycznej ścieżce, którego
+    cały ten projekt ma unikać) → zapis kliknięcia w tle przez Celery (nie
     blokuje odpowiedzi) → 302.
 
     Etap 2 miał to wszystko synchronicznie w widoku — stąd benchmark
@@ -66,6 +79,7 @@ def redirect_view(request, code):
             "is_active": link.is_active,
             "expires_at": link.expires_at.isoformat() if link.expires_at else None,
             "max_clicks": link.max_clicks,
+            "password_hash": link.password_hash,
         }
         # Sygnały w signals.py kasują ten klucz przy zapisie/usunięciu
         # Linku, więc TTL tutaj jest tylko siatką bezpieczeństwa (np. na
@@ -79,6 +93,22 @@ def redirect_view(request, code):
     if data["expires_at"] and timezone.now() >= parse_datetime(data["expires_at"]):
         raise Http404
 
+    if data["password_hash"]:
+        # Sam widok formularza z hasłem nie liczy się jako kliknięcie —
+        # ani do max_clicks, ani do analityki. Dopiero poprawne hasło
+        # kończy się w _finish_redirect, dokładnie tak samo jak link bez
+        # hasła.
+        error = None
+        if request.method == "POST":
+            if check_password(request.POST.get("password", ""), data["password_hash"]):
+                return _finish_redirect(request, code, data)
+            error = "Nieprawidłowe hasło."
+        return render(request, "links/password.html", {"error": error})
+
+    return _finish_redirect(request, code, data)
+
+
+def _finish_redirect(request, code, data):
     if data["max_clicks"] is not None:
         counter_key = f"clicks:{code}"
         # add() ustawia 0 tylko jeśli klucza jeszcze nie ma (atomowo, bez
