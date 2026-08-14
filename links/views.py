@@ -1,17 +1,31 @@
 from django.contrib.auth.hashers import check_password
 from django.core.cache import cache
-from django.http import Http404, HttpResponseRedirect
+from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from links.forms import LinkForm
 from links.models import Link
+from links.ratelimit import RateLimitExceeded, check_rate_limit
 from links.services import create_link
 from links.tasks import record_click_task
 from links.utils import get_client_ip
 
 CACHE_TTL = 3600
+
+# Progi z sekcji 4.4 specyfikacji. Tworzenie linku anonimowo ma niższy
+# limit niż zalogowany, ale wciąż działa - anonimowe tworzenie linków
+# jest zamierzoną funkcją, nie przeoczeniem (patrz Link.owner nullable).
+RATE_LIMIT_CREATE_ANONYMOUS = 3  # na godzinę, per IP
+RATE_LIMIT_CREATE_AUTHENTICATED = 20  # na godzinę, per użytkownik
+RATE_LIMIT_REDIRECT_PER_IP = 300  # na minutę
+
+
+def _rate_limited_response(exc: RateLimitExceeded) -> HttpResponse:
+    response = HttpResponse("Za dużo żądań, spróbuj ponownie później.", status=429)
+    response["Retry-After"] = str(exc.retry_after)
+    return response
 
 
 def create_link_view(request):
@@ -21,9 +35,20 @@ def create_link_view(request):
     short_code = None
 
     if request.method == "POST":
+        owner = request.user if request.user.is_authenticated else None
+        if owner:
+            limit_key = f"ratelimit:create:user:{owner.id}"
+            limit = RATE_LIMIT_CREATE_AUTHENTICATED
+        else:
+            limit_key = f"ratelimit:create:ip:{get_client_ip(request)}"
+            limit = RATE_LIMIT_CREATE_ANONYMOUS
+        try:
+            check_rate_limit(limit_key, limit=limit, window_seconds=3600)
+        except RateLimitExceeded as exc:
+            return _rate_limited_response(exc)
+
         form = LinkForm(request.POST)
         if form.is_valid():
-            owner = request.user if request.user.is_authenticated else None
             try:
                 link = create_link(
                     owner=owner,
@@ -65,6 +90,15 @@ def redirect_view(request, code):
     Etap 2 miał to wszystko synchronicznie w widoku — stąd benchmark
     "przed" w private/notatki.md. To jest wersja "po".
     """
+    try:
+        check_rate_limit(
+            f"ratelimit:redirect:ip:{get_client_ip(request)}",
+            limit=RATE_LIMIT_REDIRECT_PER_IP,
+            window_seconds=60,
+        )
+    except RateLimitExceeded as exc:
+        return _rate_limited_response(exc)
+
     cache_key = f"link:{code}"
     data = cache.get(cache_key)
 

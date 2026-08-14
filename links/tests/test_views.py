@@ -1,5 +1,7 @@
 from datetime import timedelta
+from unittest.mock import patch
 
+from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
 from django.core.cache import cache
 from django.test import TestCase
@@ -188,6 +190,9 @@ class RedirectViewPasswordTests(TestCase):
 
 
 class CreateLinkViewTests(TestCase):
+    def setUp(self):
+        cache.clear()
+
     def test_formularz_tworzy_link_i_pokazuje_krotki_adres(self):
         response = self.client.post(
             reverse("links:create"),
@@ -242,3 +247,56 @@ class StatsViewTests(TestCase):
         response = self.client.get(reverse("links:stats", args=["brakuje"]))
 
         self.assertEqual(response.status_code, 404)
+
+
+class RateLimitViewTests(TestCase):
+    """Limity same w sobie (INCR + EXPIRE) są przetestowane w
+    test_ratelimit.py - tutaj sprawdzamy tylko, że widoki faktycznie
+    z nich korzystają i poprawnie zwracają 429 + Retry-After. Stałe
+    limitów przycięte przez patch, żeby nie robić setek żądań w teście."""
+
+    def setUp(self):
+        cache.clear()
+
+    @patch("links.views.RATE_LIMIT_CREATE_ANONYMOUS", 2)
+    def test_anonim_po_przekroczeniu_limitu_dostaje_429(self):
+        url = reverse("links:create")
+        data = {"target_url": "https://example.com/x", "title": ""}
+
+        for _ in range(2):
+            response = self.client.post(url, data)
+            self.assertEqual(response.status_code, 200)
+
+        response = self.client.post(url, data)
+
+        self.assertEqual(response.status_code, 429)
+        self.assertIn("Retry-After", response)
+        self.assertEqual(Link.objects.count(), 2)
+
+    @patch("links.views.RATE_LIMIT_CREATE_AUTHENTICATED", 2)
+    def test_zalogowany_ma_osobny_wyzszy_limit(self):
+        user = get_user_model().objects.create_user(username="uzytkownik", password="haslo123")
+        self.client.force_login(user)
+        url = reverse("links:create")
+        data = {"target_url": "https://example.com/x", "title": ""}
+
+        for _ in range(2):
+            response = self.client.post(url, data)
+            self.assertEqual(response.status_code, 200)
+
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, 429)
+
+    @patch("links.views.RATE_LIMIT_REDIRECT_PER_IP", 3)
+    def test_przekierowanie_po_przekroczeniu_limitu_dostaje_429(self):
+        link = Link.objects.create(code="limit1", target_url="https://example.com/cel")
+        url = reverse("links:redirect", args=[link.code])
+
+        for _ in range(3):
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 302)
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 429)
+        self.assertIn("Retry-After", response)
