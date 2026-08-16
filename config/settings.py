@@ -29,6 +29,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
+    'rest_framework.authtoken',
+    'drf_spectacular',
     'links',
 ]
 
@@ -156,3 +159,27 @@ CELERY_TIMEZONE = TIME_ZONE
 # testu zamiast zniknąć w logu workera.
 CELERY_TASK_ALWAYS_EAGER = 'test' in sys.argv
 CELERY_TASK_EAGER_PROPAGATES = True
+
+
+# API (links/api_views.py) - etap 6. Token auth (nie sesje/ciasteczka -
+# to API do skryptowego użytku, nie do przeglądarki), domyślnie każdy
+# endpoint wymaga zalogowania (anonimowe tworzenie linków to funkcja
+# formularza webowego, nie API - patrz notatki).
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'shortenlink API',
+    'DESCRIPTION': 'Skracacz URL z analityką - zarządzanie linkami i statystyki kliknięć.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+}
