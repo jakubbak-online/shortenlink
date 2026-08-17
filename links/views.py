@@ -8,7 +8,7 @@ from django.utils.dateparse import parse_datetime
 from links.forms import LinkForm
 from links.models import Link
 from links.ratelimit import RateLimitExceeded, check_rate_limit
-from links.services import create_link
+from links.services import create_link, link_total_clicks
 from links.tasks import record_click_task
 from links.utils import get_client_ip
 
@@ -175,10 +175,24 @@ def stats_view(request, code):
     except Link.DoesNotExist:
         raise Http404
 
-    events = link.events.order_by("-created_at")
+    # Wykres/tabela dzienna z DailyStat (agregat, szybkie) - nie z
+    # ClickEvent (surowe zdarzenia, wolne przy dużej historii i znikają
+    # po 90 dniach). Lista "ostatnie kliknięcia" niżej jest jedynym
+    # miejscem, gdzie nadal czytamy ClickEvent wprost - to podgląd na
+    # żywo, nie coś, co ma sens trzymać wiecznie zagregowane.
+    daily_stats = link.daily_stats.order_by("-date")[:30]
+    recent_events = link.events.order_by("-created_at")[:50]
+
     context = {
         "link": link,
-        "total_clicks": events.count(),
-        "recent_events": events[:50],
+        "total_clicks": link_total_clicks(link),
+        "daily_stats": daily_stats,
+        # Do wykresu: chronologicznie (najstarszy pierwszy), same proste
+        # typy - json_script w szablonie nie ugryzie QuerySet/date wprost.
+        "daily_stats_chart": [
+            {"date": stat.date.isoformat(), "clicks": stat.clicks}
+            for stat in reversed(daily_stats)
+        ],
+        "recent_events": recent_events,
     }
     return render(request, "links/stats.html", context)

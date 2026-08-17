@@ -9,6 +9,7 @@ można to samo bez zmian wywołać z zadania w tle.
 import hashlib
 import re
 import secrets
+from datetime import date, timedelta
 from functools import lru_cache
 from urllib.parse import urlparse
 
@@ -16,10 +17,17 @@ import user_agents
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.db import IntegrityError, transaction
+from django.db.models import Count, Sum
+from django.utils import timezone
 from geoip2.database import Reader
 from geoip2.errors import AddressNotFoundError
 
-from links.models import ClickEvent, Link
+from links.models import ClickEvent, DailyStat, Link
+
+# Ile dni surowe ClickEvent mają żyć, zanim purge_old_events je skasuje —
+# RODO: nie trzymamy danych dłużej, niż faktycznie potrzeba. DailyStat
+# (agregaty) tego cięcia nie dotyczy, zostają na zawsze.
+CLICK_EVENT_RETENTION_DAYS = 90
 
 ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 CODE_LENGTH = 6
@@ -176,3 +184,56 @@ def record_click(*, link_id: int, ip: str, user_agent: str, referer: str, timest
         browser=ua.browser.family,
         os=ua.os.family,
     )
+
+
+def aggregate_daily_stats_for_date(target_date: date) -> int:
+    """Liczy DailyStat dla jednego dnia ze wszystkich linków naraz (jedno
+    zapytanie z GROUP BY po link_id, nie pętla po linkach).
+
+    update_or_create sprawia, że wywołanie jest idempotentne — ponowne
+    odpalenie dla tego samego dnia (np. ręcznie, po znalezieniu błędu)
+    nadpisuje wynik zamiast go podwajać. Boty wykluczone: liczyłyby się
+    do statystyk, a to zafałszowuje dane (patrz classify_device).
+
+    Zwraca liczbę linków, dla których coś zapisano — do logów/testów.
+    """
+    rows = (
+        ClickEvent.objects
+        .filter(created_at__date=target_date)
+        .exclude(device_type="bot")
+        .values("link_id")
+        .annotate(clicks=Count("id"), uniques=Count("ip_hash", distinct=True))
+    )
+    for row in rows:
+        DailyStat.objects.update_or_create(
+            link_id=row["link_id"],
+            date=target_date,
+            defaults={"clicks": row["clicks"], "unique_visitors": row["uniques"]},
+        )
+    return len(rows)
+
+
+def purge_old_click_events(retention_days: int = CLICK_EVENT_RETENTION_DAYS) -> int:
+    """Kasuje surowe ClickEvent starsze niż retention_days. DailyStat nie
+    dotyczy — te wiersze mają zostać na stałe, to one dźwigają historyczne
+    statystyki po tym, jak surowe zdarzenia znikną."""
+    cutoff = timezone.now() - timedelta(days=retention_days)
+    deleted, _ = ClickEvent.objects.filter(created_at__lt=cutoff).delete()
+    return deleted
+
+
+def link_total_clicks(link: Link) -> int:
+    """Suma kliknięć w całej historii linku, odporna na purge_old_events.
+
+    Nie samo ClickEvent.objects.filter(link=link).count() — po 90 dniach
+    surowe zdarzenia znikają, a DailyStat zostaje. Dzisiejszy dzień
+    jeszcze nie ma swojego DailyStat (agregacja liczy "wczoraj"), więc
+    dolicza się go osobno wprost z ClickEvent, też z pominięciem botów."""
+    historical = link.daily_stats.aggregate(total=Sum("clicks"))["total"] or 0
+    today_count = (
+        link.events
+        .filter(created_at__date=timezone.now().date())
+        .exclude(device_type="bot")
+        .count()
+    )
+    return historical + today_count

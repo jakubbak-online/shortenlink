@@ -10,6 +10,36 @@
 
     <p class="total-clicks">Kliknięcia łącznie: <strong>{{ total_clicks }}</strong></p>
 
+    {% if daily_stats %}
+        {{ daily_stats_chart|json_script:"daily-stats-data" }}
+        <canvas id="daily-stats-chart" height="80"></canvas>
+
+        <div class="table-scroll">
+            <table class="events-table">
+                <thead>
+                    <tr>
+                        <th>Dzień</th>
+                        <th>Kliknięcia</th>
+                        <th>Unikalni odwiedzający</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for stat in daily_stats %}
+                        <tr>
+                            <td>{{ stat.date|date:"Y-m-d" }}</td>
+                            <td>{{ stat.clicks }}</td>
+                            <td>{{ stat.unique_visitors }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="hint">Dzienne statystyki pojawią się tu po pierwszej nocnej agregacji.</p>
+    {% endif %}
+
+    <h2>Ostatnie kliknięcia</h2>
+
     {% if recent_events %}
         <div class="table-scroll">
             <table class="events-table">
@@ -39,5 +69,29 @@
         </div>
     {% else %}
         <p>Jeszcze żadnych kliknięć.</p>
+    {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+    {% if daily_stats %}
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+        <script>
+            const dailyStats = JSON.parse(document.getElementById("daily-stats-data").textContent);
+            new Chart(document.getElementById("daily-stats-chart"), {
+                type: "bar",
+                data: {
+                    labels: dailyStats.map((row) => row.date),
+                    datasets: [{
+                        label: "Kliknięcia / dzień",
+                        data: dailyStats.map((row) => row.clicks),
+                        backgroundColor: "#2f6feb",
+                    }],
+                },
+                options: {
+                    scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+                    plugins: { legend: { display: false } },
+                },
+            });
+        </script>
     {% endif %}
 {% endblock %}

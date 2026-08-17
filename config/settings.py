@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'drf_spectacular',
+    'django_celery_beat',
     'links',
 ]
 
@@ -159,6 +160,19 @@ CELERY_TIMEZONE = TIME_ZONE
 # testu zamiast zniknąć w logu workera.
 CELERY_TASK_ALWAYS_EAGER = 'test' in sys.argv
 CELERY_TASK_EAGER_PROPAGATES = True
+
+# Produkcyjny hasher (PBKDF2, duża liczba iteracji - to jego zadanie, ma
+# być wolny) potrafi kosztować kilka sekund na jedno wywołanie. Testy,
+# które hashują hasła (linki z hasłem, tworzenie użytkowników), nie
+# potrzebują tej siły - w konfiguracji testowej podmieniamy na szybki,
+# niebezpieczny hasher, żeby testy trwały sekundy, a nie minuty.
+if 'test' in sys.argv:
+    PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
+
+# django-celery-beat: harmonogram (aggregate_daily_stats, purge_old_events)
+# trzymany w bazie, nie w tym pliku - widoczny i edytowalny z poziomu
+# panelu admina, bez redeployu przy zmianie godziny czy wyłączeniu zadania.
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
 
 # API (links/api_views.py) - etap 6. Token auth (nie sesje/ciasteczka -

@@ -46,3 +46,23 @@ class ClickEvent(models.Model):
 
     def __str__(self):
         return f"{self.link.code} @ {self.created_at:%Y-%m-%d %H:%M}"
+
+
+class DailyStat(models.Model):
+    # Denormalizacja celowa: wykres za 90 dni liczony z ClickEvent przy
+    # każdym wejściu na dashboard oznacza skanowanie i grupowanie setek
+    # tysięcy wierszy za każdym razem. Nocne zadanie liczy to raz i
+    # zapisuje garść wierszy zamiast tego. Dodatkowa korzyść: te wiersze
+    # przeżywają purge_old_events (retencja surowych zdarzeń), więc
+    # historyczne liczby zostają nawet po wyczyszczeniu ClickEvent.
+    link = models.ForeignKey(Link, on_delete=models.CASCADE, related_name="daily_stats")
+    date = models.DateField()
+    clicks = models.PositiveIntegerField(default=0)
+    unique_visitors = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["link", "date"], name="uniq_link_date")]
+        indexes = [models.Index(fields=["link", "-date"])]
+
+    def __str__(self):
+        return f"{self.link.code} {self.date}: {self.clicks}"

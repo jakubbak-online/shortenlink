@@ -117,6 +117,19 @@ button:hover {
     font-size: 1.1rem;
 }
 
+.hint {
+    color: var(--muted);
+}
+
+h2 {
+    font-size: 1.1rem;
+    margin: 2rem 0 0.75rem;
+}
+
+#daily-stats-chart {
+    margin-bottom: 1.5rem;
+}
+
 .events-table {
     width: 100%;
     border-collapse: collapse;

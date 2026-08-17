@@ -41,5 +41,19 @@ services:
       db: {condition: service_healthy}
       redis: {condition: service_started}
 
+  beat:
+    build: .
+    # Harmonogram (kiedy odpalić dane zadanie) jest osobnym procesem od
+    # workera (który je wykonuje) - dzięki temu można skalować workerów
+    # do wielu instancji bez ryzyka, że to samo zadanie cykliczne odpali
+    # się kilka razy naraz. DatabaseScheduler (ustawiony w settings.py)
+    # czyta harmonogram z tabeli PeriodicTask, nie z tego pliku.
+    command: celery -A config beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    env_file: .env
+    volumes: [.:/app]
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_started}
+
 volumes:
   pgdata:

@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import date, timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -8,7 +8,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from links.models import ClickEvent, Link
+from links.models import ClickEvent, DailyStat, Link
 
 
 class RedirectViewTests(TestCase):
@@ -247,6 +247,15 @@ class StatsViewTests(TestCase):
         response = self.client.get(reverse("links:stats", args=["brakuje"]))
 
         self.assertEqual(response.status_code, 404)
+
+    def test_pokazuje_zagregowane_dane_z_dailystat(self):
+        link = Link.objects.create(code="agr123", target_url="https://example.com")
+        DailyStat.objects.create(link=link, date=date(2026, 8, 1), clicks=42, unique_visitors=10)
+
+        response = self.client.get(reverse("links:stats", args=[link.code]))
+
+        self.assertContains(response, "42")
+        self.assertContains(response, "2026-08-01")
 
 
 class RateLimitViewTests(TestCase):
