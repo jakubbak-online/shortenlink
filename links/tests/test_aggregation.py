@@ -57,12 +57,16 @@ class AggregateDailyStatsTests(TestCase):
         # Klasyczna pomyłka o jeden dzień: 23:59:59 i 00:00:00 następnego
         # dnia różnią się o sekundę, ale mają trafić do różnych DailyStat.
         ClickEvent.objects.create(
-            link=self.link, created_at=_at("2026-08-10", "23:59:59"),
-            ip_hash="a", device_type="desktop",
+            link=self.link,
+            created_at=_at("2026-08-10", "23:59:59"),
+            ip_hash="a",
+            device_type="desktop",
         )
         ClickEvent.objects.create(
-            link=self.link, created_at=_at("2026-08-11", "00:00:00"),
-            ip_hash="b", device_type="desktop",
+            link=self.link,
+            created_at=_at("2026-08-11", "00:00:00"),
+            ip_hash="b",
+            device_type="desktop",
         )
 
         aggregate_daily_stats_for_date(date(2026, 8, 10))
@@ -89,12 +93,16 @@ class PurgeOldClickEventsTests(TestCase):
 
     def test_kasuje_tylko_starsze_niz_retencja(self):
         old = ClickEvent.objects.create(
-            link=self.link, created_at=timezone.now() - timedelta(days=91),
-            ip_hash="a", device_type="desktop",
+            link=self.link,
+            created_at=timezone.now() - timedelta(days=91),
+            ip_hash="a",
+            device_type="desktop",
         )
         recent = ClickEvent.objects.create(
-            link=self.link, created_at=timezone.now() - timedelta(days=10),
-            ip_hash="b", device_type="desktop",
+            link=self.link,
+            created_at=timezone.now() - timedelta(days=10),
+            ip_hash="b",
+            device_type="desktop",
         )
 
         deleted = purge_old_click_events(retention_days=90)
@@ -111,7 +119,10 @@ class LinkTotalClicksTests(TestCase):
     def test_liczy_historyczne_i_dzisiejsze_razem(self):
         DailyStat.objects.create(link=self.link, date=date(2026, 8, 1), clicks=7, unique_visitors=3)
         ClickEvent.objects.create(
-            link=self.link, created_at=timezone.now(), ip_hash="x", device_type="desktop",
+            link=self.link,
+            created_at=timezone.now(),
+            ip_hash="x",
+            device_type="desktop",
         )
 
         self.assertEqual(link_total_clicks(self.link), 8)

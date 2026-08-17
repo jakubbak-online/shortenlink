@@ -95,9 +95,7 @@ class RedirectViewCacheTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_nieaktywny_link_zwraca_404(self):
-        link = Link.objects.create(
-            code="cache5", target_url="https://example.com/cel", is_active=False
-        )
+        link = Link.objects.create(code="cache5", target_url="https://example.com/cel", is_active=False)
 
         response = self.client.get(reverse("links:redirect", args=[link.code]))
         self.assertEqual(response.status_code, 404)
@@ -123,9 +121,7 @@ class RedirectViewCacheTests(TestCase):
         self.assertEqual(response.status_code, 302)
 
     def test_limit_klikniec_blokuje_po_przekroczeniu(self):
-        link = Link.objects.create(
-            code="cache8", target_url="https://example.com/cel", max_clicks=3
-        )
+        link = Link.objects.create(code="cache8", target_url="https://example.com/cel", max_clicks=3)
         url = reverse("links:redirect", args=[link.code])
 
         for _ in range(3):
@@ -159,9 +155,7 @@ class RedirectViewPasswordTests(TestCase):
             password_hash=make_password("sezam"),
         )
 
-        response = self.client.post(
-            reverse("links:redirect", args=["haslo2"]), {"password": "zle-haslo"}
-        )
+        response = self.client.post(reverse("links:redirect", args=["haslo2"]), {"password": "zle-haslo"})
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(ClickEvent.objects.count(), 0)
@@ -173,9 +167,7 @@ class RedirectViewPasswordTests(TestCase):
             password_hash=make_password("sezam"),
         )
 
-        response = self.client.post(
-            reverse("links:redirect", args=["haslo3"]), {"password": "sezam"}
-        )
+        response = self.client.post(reverse("links:redirect", args=["haslo3"]), {"password": "sezam"})
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], "https://example.com/cel")

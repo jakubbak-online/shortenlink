@@ -1,7 +1,6 @@
-from freezegun import freeze_time
-
 from django.core.cache import cache
 from django.test import TestCase, override_settings
+from freezegun import freeze_time
 
 from links.ratelimit import RateLimitExceeded, check_rate_limit
 

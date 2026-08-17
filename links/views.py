@@ -190,8 +190,7 @@ def stats_view(request, code):
         # Do wykresu: chronologicznie (najstarszy pierwszy), same proste
         # typy - json_script w szablonie nie ugryzie QuerySet/date wprost.
         "daily_stats_chart": [
-            {"date": stat.date.isoformat(), "clicks": stat.clicks}
-            for stat in reversed(daily_stats)
+            {"date": stat.date.isoformat(), "clicks": stat.clicks} for stat in reversed(daily_stats)
         ],
         "recent_events": recent_events,
     }

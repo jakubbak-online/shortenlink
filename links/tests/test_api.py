@@ -28,17 +28,13 @@ class AuthTests(LinkApiTestCase):
         self.assertEqual(response.status_code, 401)
 
     def test_token_endpoint_zwraca_token_dla_poprawnych_danych(self):
-        response = self.client.post(
-            reverse("api-token"), {"username": "alice", "password": "haslo123"}
-        )
+        response = self.client.post(reverse("api-token"), {"username": "alice", "password": "haslo123"})
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("token", response.json())
 
     def test_token_endpoint_odrzuca_zle_haslo(self):
-        response = self.client.post(
-            reverse("api-token"), {"username": "alice", "password": "zle-haslo"}
-        )
+        response = self.client.post(reverse("api-token"), {"username": "alice", "password": "zle-haslo"})
 
         self.assertEqual(response.status_code, 400)
 

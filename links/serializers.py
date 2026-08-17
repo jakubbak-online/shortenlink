@@ -26,8 +26,16 @@ class LinkSerializer(serializers.ModelSerializer):
     class Meta:
         model = Link
         fields = [
-            "code", "short_url", "target_url", "title", "is_active",
-            "expires_at", "max_clicks", "created_at", "custom_code", "password",
+            "code",
+            "short_url",
+            "target_url",
+            "title",
+            "is_active",
+            "expires_at",
+            "max_clicks",
+            "created_at",
+            "custom_code",
+            "password",
         ]
         read_only_fields = ["code", "created_at"]
 

@@ -36,8 +36,14 @@ MAX_GENERATE_ATTEMPTS = 5
 # Słowa, których nie może zająć wygenerowany ani własny kod — kolidowałyby
 # z resztą routingu (/admin/, /api/...).
 RESERVED_CODES = {
-    "admin", "api", "static", "media",
-    "login", "logout", "register", "docs",
+    "admin",
+    "api",
+    "static",
+    "media",
+    "login",
+    "logout",
+    "register",
+    "docs",
 }
 
 # Własny kod jest luźniejszy niż losowy (dopuszcza myślnik/podkreślnik,
@@ -198,8 +204,7 @@ def aggregate_daily_stats_for_date(target_date: date) -> int:
     Zwraca liczbę linków, dla których coś zapisano — do logów/testów.
     """
     rows = (
-        ClickEvent.objects
-        .filter(created_at__date=target_date)
+        ClickEvent.objects.filter(created_at__date=target_date)
         .exclude(device_type="bot")
         .values("link_id")
         .annotate(clicks=Count("id"), uniques=Count("ip_hash", distinct=True))
@@ -231,9 +236,6 @@ def link_total_clicks(link: Link) -> int:
     dolicza się go osobno wprost z ClickEvent, też z pominięciem botów."""
     historical = link.daily_stats.aggregate(total=Sum("clicks"))["total"] or 0
     today_count = (
-        link.events
-        .filter(created_at__date=timezone.now().date())
-        .exclude(device_type="bot")
-        .count()
+        link.events.filter(created_at__date=timezone.now().date()).exclude(device_type="bot").count()
     )
     return historical + today_count
