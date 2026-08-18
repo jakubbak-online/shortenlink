@@ -1,0 +1,71 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: shortenlink
+      POSTGRES_USER: shortenlink
+      POSTGRES_PASSWORD: shortenlink
+    volumes: [pgdata:/var/lib/postgresql/data]
+    # Bez ports: - w wersji dev Postgres jest wystawiony na hosta (wygodny
+    # podgląd z narzędzia na Windowsie), w produkcji nie ma powodu, żeby
+    # baza była osiągalna z internetu - tylko z innych kontenerów w tej
+    # samej sieci compose, po nazwie usługi ("db").
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shortenlink"]
+      interval: 5s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  # Jednorazowe: migracje + collectstatic, potem kończy się. Reszta
+  # czeka na jego sukces - patrz komentarz w docker-compose.yml,
+  # ten sam powód (beat kiedyś odpalał się przed nałożeniem schematu).
+  migrate:
+    build: .
+    command: sh -c "python manage.py migrate --noinput && python manage.py collectstatic --noinput"
+    env_file: .env
+    depends_on:
+      db: {condition: service_healthy}
+
+  web:
+    build: .
+    # gunicorn, nie runserver - runserver jest jednowątkowy i explicite
+    # nieprzeznaczony do produkcji (Django samo o tym ostrzega w logu).
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3
+    env_file: .env
+    # Bez domeny na razie - port 80 wprost na kontener. Jak dojdzie
+    # domena, to miejsce zajmie reverse proxy (Caddy) z automatycznym
+    # HTTPS, a ten port zostanie tylko wewnątrz sieci compose.
+    ports: ["80:8000"]
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_started}
+      migrate: {condition: service_completed_successfully}
+    restart: unless-stopped
+
+  worker:
+    build: .
+    # Mniejsza współbieżność niż w dev-compose - droplet ma mniej
+    # rdzeni niż typowa maszyna deweloperska, nie ma sensu przelicytować.
+    command: celery -A config worker --loglevel=info --concurrency=2
+    env_file: .env
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_started}
+      migrate: {condition: service_completed_successfully}
+    restart: unless-stopped
+
+  beat:
+    build: .
+    command: celery -A config beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    env_file: .env
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_started}
+      migrate: {condition: service_completed_successfully}
+    restart: unless-stopped
+
+volumes:
+  pgdata:
