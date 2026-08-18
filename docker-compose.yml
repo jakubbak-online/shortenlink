@@ -15,17 +15,30 @@ services:
     image: redis:7-alpine
     ports: ["6379:6379"]
 
+  # Jednorazowe zadanie: nakłada migracje i zbiera statyki, potem kończy
+  # się (exit 0). web/worker/beat czekają na to przez
+  # `service_completed_successfully`, zanim same wystartują - bez tego
+  # `depends_on: db: service_healthy` gwarantuje tylko, że sam Postgres
+  # odpowiada, nie że schemat już istnieje. beat odpalony równolegle z
+  # migracją realnie się na tym wywalał (`relation ... does not exist`),
+  # bo próbował czytać harmonogram z tabeli, której jeszcze nie było.
+  migrate:
+    build: .
+    command: sh -c "python manage.py migrate --noinput && python manage.py collectstatic --noinput"
+    env_file: .env
+    depends_on:
+      db: {condition: service_healthy}
+
   web:
     build: .
     command: python manage.py runserver 0.0.0.0:8000
-    environment:
-      RUN_MIGRATIONS: "1"
     env_file: .env
     volumes: [.:/app]
     ports: ["8000:8000"]
     depends_on:
       db: {condition: service_healthy}
       redis: {condition: service_started}
+      migrate: {condition: service_completed_successfully}
 
   worker:
     build: .
@@ -40,6 +53,7 @@ services:
     depends_on:
       db: {condition: service_healthy}
       redis: {condition: service_started}
+      migrate: {condition: service_completed_successfully}
 
   beat:
     build: .
@@ -54,6 +68,7 @@ services:
     depends_on:
       db: {condition: service_healthy}
       redis: {condition: service_started}
+      migrate: {condition: service_completed_successfully}
 
 volumes:
   pgdata:
