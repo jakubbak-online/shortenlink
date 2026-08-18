@@ -1,128 +1,141 @@
 # shortenlink
 
-Skracacz linków z analityką kliknięć. Jedno zdanie, o które tu chodzi:
-**przekierowanie musi być natychmiastowe, a zapis analityki jest wolny —
-więc te dwie rzeczy są rozdzielone**: przekierowanie czyta z cache'u i
-odpowiada od razu, zapis kliknięcia (parsowanie User-Agenta, lookup
-kraju, insert do bazy) leci do kolejki i dzieje się w tle, już po tym,
-jak użytkownik dostał odpowiedź.
+[Wersja polska](README.pl.md)
 
-## Uruchomienie
+![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
+![Django](https://img.shields.io/badge/Django-6.0-092E20?logo=django&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)
+![Celery](https://img.shields.io/badge/Celery-5-37814A?logo=celery&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+![pytest](https://img.shields.io/badge/tested%20with-pytest-0A9EDC?logo=pytest&logoColor=white)
+[![CI](https://github.com/jakubbak-online/shortenlink/actions/workflows/ci.yml/badge.svg)](https://github.com/jakubbak-online/shortenlink/actions/workflows/ci.yml)
+
+A URL shortener with click analytics. One sentence covers what this
+project is actually about: **the redirect has to be instant, and
+writing analytics is slow — so the two are decoupled.** The redirect
+reads from cache and answers right away; recording the click (parsing
+the User-Agent, looking up the country, writing to the database) goes
+onto a queue and happens in the background, after the user already has
+their response.
+
+## Running it
 
 ```bash
-cp .env.example .env      # i uzupełnij SECRET_KEY / IP_SALT
+cp .env.example .env      # fill in SECRET_KEY / IP_SALT
 docker compose up
 ```
 
-To wszystko. Migracje i `collectstatic` nakładają się same przy starcie
-(`entrypoint.sh`). Aplikacja stoi pod `http://localhost:8000/`.
+That's it. Migrations and `collectstatic` run automatically on startup
+(`entrypoint.sh`). The app is served at `http://localhost:8000/`.
 
-## Jak to działa (ścieżka przekierowania)
+## How it works (the redirect path)
 
 ```
                     GET /<code>/
-przeglądarka  ─────────────────────▶  Django (gunicorn)
+browser       ─────────────────────▶  Django (gunicorn)
                                             │
                               cache hit     │     cache miss
-                       (Redis: link:<code>)│  (Postgres, potem zapis do cache'u)
+                        (Redis: link:<code>)│  (Postgres, then written to cache)
                               ┌─────────────┴─────────────┐
                               ▼                           ▼
-                          dane linku              SELECT z Postgresa
+                          link data                SELECT from Postgres
                               │                           │
                               └─────────────┬─────────────┘
                                             ▼
-                     is_active? / expires_at? / hasło? / max_clicks?
-                              (limit liczony INCR-em w Redisie,
-                               nie COUNT(*) na zdarzeniach)
+                    is_active? / expires_at? / password? / max_clicks?
+                              (limit tracked via Redis INCR,
+                               not COUNT(*) on events)
                                             │
                                             ▼
-                              302 → target_url  ◀── przeglądarka dostaje to OD RAZU
+                              302 → target_url  ◀── browser gets this RIGHT AWAY
                                             │
-                                            ┆  (w tle, po wysłaniu odpowiedzi)
+                                            ┆  (in the background, after the response)
                                             ▼
-                                  Celery worker: parsuje User-Agenta,
-                                  hashuje IP, dolicza kraj, zapisuje
-                                  ClickEvent w Postgresie
+                                  Celery worker: parses the User-Agent,
+                                  hashes the IP, resolves the country,
+                                  writes ClickEvent to Postgres
                                             │
-                          co noc, Celery beat ▼
-                          agreguje wczorajsze ClickEvent → DailyStat
-                          (dashboard czyta stąd, nie ze zdarzeń)
-                          i czyści zdarzenia starsze niż 90 dni
+                          every night, Celery beat ▼
+                          aggregates yesterday's ClickEvents → DailyStat
+                          (the dashboard reads from here, not raw events)
+                          and purges events older than 90 days
 ```
 
-## Decyzje projektowe
+## Design decisions
 
-**Zapis kliknięcia jest asynchroniczny.** Insert do Postgresa, parsowanie
-User-Agenta i lookup geolokalizacyjny to kilkanaście milisekund
-doklejone do *każdego* przekierowania — a nikt nie patrzy na dashboard w
-tej samej sekundzie, w której ktoś kliknął. Widok wrzuca zadanie do
-Celery i natychmiast zwraca `302`; cała wolna robota dzieje się w
-workerze, po odpowiedzi. Koszt: jeśli worker akurat nie działa,
-przekierowania idą dalej bez przeszkód, ale pojedyncze kliknięcia z tego
-okresu się nie zapiszą — świadomie zaakceptowane, to analityka, nie
-rozliczenia finansowe.
+**Recording a click is asynchronous.** A Postgres insert, User-Agent
+parsing, and a geolocation lookup add up to a dozen-odd milliseconds
+tacked onto *every* redirect — and nobody looks at the dashboard in the
+same second someone clicked. The view enqueues a Celery task and
+returns `302` immediately; all the slow work happens in the worker,
+after the response. Cost: if the worker happens to be down, redirects
+keep working without interruption, but individual clicks from that
+window never get recorded — accepted deliberately, this is analytics,
+not financial records.
 
-**`302`, nie `301`.** Przekierowanie trwałe przeglądarka zapamiętuje na
-stałe i przy kolejnych wejściach w ogóle nie odpytuje serwera —
-analityka przestaje działać, a zmiana docelowego adresu nigdy nie
-dotrze do osób, które już raz kliknęły. `302` wymusza zapytanie za
-każdym razem, kosztem tego, że każde kliknięcie to realny request
-zamiast lokalnej pamięci przeglądarki.
+**`302`, not `301`.** A permanent redirect gets cached by the browser
+for good, so it stops asking the server on later visits — analytics
+stop counting, and a changed target URL never reaches people who
+already clicked once. `302` forces a request every single time, at the
+cost of every click being a real request instead of the browser's
+local memory.
 
-**Kolizje kodów obsługiwane przez `IntegrityError`, nie `exists()`.**
-Sprawdzenie "czy kod jest wolny", a potem zapis to klasyczny wyścig —
-dwa równoległe żądania mogą zobaczyć ten sam wolny kod i oba spróbować
-go zapisać. Jedyna instancja, która potrafi to rozstrzygnąć atomowo, to
-unikalny indeks w bazie: kod próbuje zapisać, łapie wyjątek przy
-kolizji, ponawia (maks. 5 razy, w praktyce prawie nigdy nie potrzeba
-więcej niż jednej próby na przestrzeni 62⁶ możliwych kodów).
+**Code collisions handled via `IntegrityError`, not `exists()`.**
+Checking "is this code free" and then writing is a classic race — two
+concurrent requests can both see the same free code and both try to
+claim it. The only thing that can resolve that atomically is a unique
+index in the database: the code tries to write, catches the exception
+on collision, and retries (up to 5 times — in practice almost never
+needed more than once across 62⁶ possible codes).
 
-**`DailyStat` jako celowa denormalizacja.** Wykres za 30-90 dni liczony
-z surowych `ClickEvent` przy każdym wejściu na dashboard oznacza
-skanowanie i grupowanie coraz większej liczby wierszy. Nocne zadanie
-Celery Beat liczy to raz dziennie i zapisuje garść zagregowanych
-wierszy zamiast tego. Dodatkowa korzyść: te wiersze przeżywają retencję
-surowych zdarzeń (90 dni), więc historyczne liczby zostają, nawet gdy
-źródłowe zdarzenia już dawno zniknęły.
+**`DailyStat` as deliberate denormalization.** A 30-90 day chart
+computed from raw `ClickEvent` rows on every dashboard visit means
+scanning and grouping a growing number of rows. A nightly Celery Beat
+job computes it once and stores a handful of aggregated rows instead.
+Bonus: those rows survive the raw-event retention window (90 days), so
+historical numbers stick around even after the source events are long
+gone.
 
-**Hash IP zamiast surowego adresu.** RODO traktuje adres IP jako dane
-osobowe. Do liczenia unikalnych wejść w danym dniu hash z solą (sól w
-zmiennej środowiskowej, nie w repo) wystarcza w zupełności, a nie
-przechowuje niczego, co identyfikuje osobę.
+**Hashed IPs instead of raw addresses.** GDPR treats an IP address as
+personal data. For counting unique visits per day, a salted hash (the
+salt lives in an environment variable, not in the repo) is more than
+enough, without storing anything that identifies a person.
 
-Do tego jedno świadome odejście od typowego schematu: `Link.owner` jest
-**nullable** — anonimowe tworzenie linków jest zamierzoną funkcją (ma
-własny, niższy limit ruchu), nie przeoczeniem.
+One more deliberate departure from the obvious schema: `Link.owner` is
+**nullable** — creating a link anonymously is an intended feature (with
+its own, lower rate limit), not an oversight.
 
-## Wyniki pomiarów
+## Benchmark results
 
-Metodologia: [Locust](https://locust.io) (`benchmarks/locustfile.py`),
-scenariusz "50 użytkowników bije w ten sam krótki link przez minutę",
-mediana i 95. percentyl czasu odpowiedzi.
+Methodology: [Locust](https://locust.io) (`benchmarks/locustfile.py`),
+scenario "50 users hammering the same short link for a minute", median
+and 95th-percentile response time.
 
-Wersja z etapu 2 (zapis kliknięcia **synchronicznie**, w widoku, bez
-cache'u) była mierzona lokalnie na SQLite, zanim środowisko dockerowe
-było gotowe — z tego pomiaru wynika jasny sygnał: mediana wygląda
-niewinnie (150 ms), ale 95. percentyl sięga kilkunastu **sekund**, bo
-ogon rozkładu degraduje się pod obciążeniem dużo wcześniej, niż widać to
-w samej średniej. Formalny, jednakowy pomiar "przed/po" na docelowym
-stosie (Postgres + Redis + Celery w Dockerze, nie SQLite) jest w
-przygotowaniu — SQLite ma inny model blokad przy współbieżnych zapisach
-niż Postgres, więc nie jest wiarygodnym punktem odniesienia dla
-ostatecznych liczb.
+The stage-2 version (recording clicks **synchronously**, inside the
+view, no cache) was measured locally on SQLite, before the Docker
+environment was ready — and the signal is clear even so: the median
+looks harmless (150 ms), but the 95th percentile reaches several
+**seconds**, because the tail of the distribution degrades under load
+well before the mean shows anything. A formal, apples-to-apples
+before/after measurement on the target stack (Postgres + Redis + Celery
+in Docker, not SQLite) is in progress — SQLite has a different locking
+model under concurrent writes than Postgres, so it isn't a trustworthy
+baseline for the final numbers.
 
-## Testy
+## Tests
 
 ```bash
 pip install -r requirements-dev.txt
 pytest
 ```
 
-W kontenerze: `docker compose exec web pytest`. Konfiguracja testowa
-odpala zadania Celery synchronicznie (`CELERY_TASK_ALWAYS_EAGER`) i
-używa szybkiego hashera haseł zamiast produkcyjnego PBKDF2 — sam test
-nie musi być tak samo drogi obliczeniowo jak prawdziwe logowanie.
+In the container: `docker compose exec web pytest`. The test
+configuration runs Celery tasks synchronously
+(`CELERY_TASK_ALWAYS_EAGER`) and swaps in a fast password hasher
+instead of the production PBKDF2 one — a test doesn't need to be as
+computationally expensive as a real login.
 
-Lint: `ruff check .` i `ruff format --check .` (uruchamiane też w CI
-przy każdym pushu, razem z pytest, na usługowych kontenerach Postgresa
-i Redisa).
+Lint: `ruff check .` and `ruff format --check .` (also run in CI on
+every push, alongside pytest, against Postgres and Redis service
+containers).
