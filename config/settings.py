@@ -136,9 +136,19 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 # pliku hash z zawartości (style.abcd1234.css) i od razu gzipuje. Dzięki
 # hashowi w nazwie można ustawić far-future cache nagłówki bez ryzyka, że
 # przeglądarka pokaże komuś starą wersję CSS-a po deployu.
+#
+# W testach nie ma po co - manifest storage wymaga, żeby collectstatic
+# już się wykonał (w CI/lokalnie nikt tego nie robi przed testami), inaczej
+# każde {% static %} w szablonie wybucha ValueError "Missing staticfiles
+# manifest entry". Zwykły StaticFilesStorage po prostu zwraca ścieżkę bez
+# hashowania - nie testujemy tu WhiteNoise, tylko własny kod.
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
-    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
+        if IS_TESTING
+        else "whitenoise.storage.CompressedManifestStaticFilesStorage"
+    },
 }
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
