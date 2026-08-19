@@ -26,6 +26,18 @@ DEBUG = config("DEBUG", default=False, cast=bool)
 
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1", cast=Csv())
 
+# Ustawienie DOMAIN w .env to jedyna rzecz potrzebna, żeby przełączyć
+# produkcję z gołego IP na domenę - dokłada się sama do ALLOWED_HOSTS
+# (z wariantem www) i do CSRF_TRUSTED_ORIGINS, więc nie trzeba osobno
+# edytować obu tych ustawień. Caddy (docker-compose.prod.yml) czyta ten
+# sam DOMAIN niezależnie, do własnej konfiguracji HTTPS.
+DOMAIN = config("DOMAIN", default="")
+if DOMAIN:
+    ALLOWED_HOSTS += [DOMAIN, f"www.{DOMAIN}"]
+    CSRF_TRUSTED_ORIGINS = [f"https://{DOMAIN}", f"https://www.{DOMAIN}"]
+else:
+    CSRF_TRUSTED_ORIGINS = []
+
 
 # Application definition
 

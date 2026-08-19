@@ -1,0 +1,15 @@
+# Reverse proxy z automatycznym HTTPS (Let's Encrypt) przed usługą web.
+#
+# Wymaga ustawionego DOMAIN w .env ORAZ działającego DNS-u wskazującego
+# na ten serwer - Let's Encrypt weryfikuje własność domeny żywym
+# żądaniem HTTP na port 80, więc dopóki DNS nie propaguje, wystawienie
+# certyfikatu się nie uda. Do tego czasu zostań przy web z portem 80
+# wystawionym wprost (patrz docker-compose.prod.yml).
+
+{$DOMAIN} {
+    reverse_proxy web:8000
+}
+
+www.{$DOMAIN} {
+    redir https://{$DOMAIN}{uri} permanent
+}

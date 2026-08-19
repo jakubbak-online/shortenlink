@@ -42,14 +42,29 @@ services:
     command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3
     env_file: .env
     volumes: [staticfiles:/app/staticfiles]
-    # Bez domeny na razie - port 80 wprost na kontener. Jak dojdzie
-    # domena, to miejsce zajmie reverse proxy (Caddy) z automatycznym
-    # HTTPS, a ten port zostanie tylko wewnątrz sieci compose.
-    ports: ["80:8000"]
+    # UWAGA: brak ports: tutaj celowo - Caddy (niżej) jest teraz jedynym
+    # wejściem z zewnątrz, web jest osiągalny tylko wewnątrz sieci
+    # compose, po nazwie usługi ("web:8000"). Nie wdrażać tej wersji
+    # compose, dopóki DNS dla DOMAIN faktycznie nie wskazuje na ten
+    # serwer (nslookup) - inaczej Caddy nie dopasuje żadnego żądania
+    # przychodzącego pod goły adres IP i strona przestanie być osiągalna.
     depends_on:
       db: {condition: service_healthy}
       redis: {condition: service_started}
       migrate: {condition: service_completed_successfully}
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
     restart: unless-stopped
 
   worker:
@@ -77,3 +92,5 @@ services:
 volumes:
   pgdata:
   staticfiles:
+  caddy_data:
+  caddy_config:
