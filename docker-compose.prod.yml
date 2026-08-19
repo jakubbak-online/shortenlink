@@ -26,6 +26,12 @@ services:
     build: .
     command: sh -c "python manage.py migrate --noinput && python manage.py collectstatic --noinput"
     env_file: .env
+    # Bez tego woluminu collectstatic zapisałby manifest (staticfiles.json
+    # z hashami w nazwach) tylko we własnym, efemerycznym systemie plików
+    # tego kontenera - web (osobny kontener, bez bind mountu jak w dev)
+    # nigdy by go nie zobaczył i wywalałby 500 na {% static %} w KAŻDYM
+    # szablonie. Wolumin dzieli /app/staticfiles między oboma.
+    volumes: [staticfiles:/app/staticfiles]
     depends_on:
       db: {condition: service_healthy}
 
@@ -35,6 +41,7 @@ services:
     # nieprzeznaczony do produkcji (Django samo o tym ostrzega w logu).
     command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3
     env_file: .env
+    volumes: [staticfiles:/app/staticfiles]
     # Bez domeny na razie - port 80 wprost na kontener. Jak dojdzie
     # domena, to miejsce zajmie reverse proxy (Caddy) z automatycznym
     # HTTPS, a ten port zostanie tylko wewnątrz sieci compose.
@@ -69,3 +76,4 @@ services:
 
 volumes:
   pgdata:
+  staticfiles:
