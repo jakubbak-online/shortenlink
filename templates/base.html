@@ -3,7 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}shortenlink{% endblock %}</title>
+    <title>{% block title %}skroclinka.pl{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="{% static 'favicon.svg' %}">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     <script>
         // Ciemny jest domyślny (brak klasy = ciemny), więc jedyny przypadek
@@ -19,8 +20,10 @@
 </head>
 <body>
     <header class="site-header">
-        <a href="{% url 'links:create' %}" class="logo">shortenlink</a>
-        <button type="button" id="theme-toggle" class="theme-toggle" aria-label="Przełącz jasny/ciemny motyw"></button>
+        <a href="{% url 'links:create' %}" class="logo">skroclinka.pl</a>
+        <button type="button" id="theme-toggle" class="theme-toggle" aria-pressed="false">
+            <span class="theme-toggle-thumb"></span>
+        </button>
     </header>
 
     <main>
@@ -28,8 +31,9 @@
     </main>
 
     <footer class="site-footer">
-        <p>shortenlink — skracacz linków z analityką</p>
+        <p>skroclinka.pl: skracacz linków z analityką</p>
         <p><a href="https://github.com/jakubbak-online/shortenlink">kod źródłowy na GitHubie</a></p>
+        <p>Autorstwa Jakub Bąk</p>
     </footer>
 
     <script>
@@ -41,15 +45,17 @@
                 return root.classList.contains("light");
             }
 
-            function updateLabel() {
-                toggle.textContent = isLight() ? "Ciemny motyw" : "Jasny motyw";
+            function updateToggle() {
+                var light = isLight();
+                toggle.setAttribute("aria-pressed", String(light));
+                toggle.setAttribute("aria-label", light ? "Przełącz na ciemny motyw" : "Przełącz na jasny motyw");
             }
 
-            updateLabel();
+            updateToggle();
             toggle.addEventListener("click", function () {
                 root.classList.toggle("light");
                 localStorage.setItem("theme", isLight() ? "light" : "dark");
-                updateLabel();
+                updateToggle();
             });
         })();
     </script>

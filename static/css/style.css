@@ -33,6 +33,9 @@
 
 body {
     margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
     background: var(--bg);
     color: var(--text);
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -56,25 +59,46 @@ body {
     color: var(--text);
 }
 
+/* Prawdziwy przełącznik (track + kółko), nie przycisk z tekstem -
+   dokładnie taki, jak "jasny/ciemny" wygląda wszędzie indziej. */
 .theme-toggle {
-    background: transparent;
-    color: var(--muted);
+    position: relative;
+    width: 42px;
+    height: 24px;
+    padding: 0;
+    background: var(--bg);
     border: 1px solid var(--border);
-    padding: 0.4rem 0.8rem;
-    border-radius: 6px;
-    font-size: 0.85rem;
+    border-radius: 999px;
     cursor: pointer;
+    flex-shrink: 0;
 }
 
 .theme-toggle:hover {
-    color: var(--text);
     border-color: var(--muted);
 }
 
+.theme-toggle-thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+:root.light .theme-toggle-thumb {
+    transform: translateX(18px);
+    background: var(--accent);
+}
+
 main {
+    flex: 1;
     max-width: 720px;
     margin: 3rem auto;
     padding: 0 1.5rem;
+    width: 100%;
 }
 
 .table-scroll {
@@ -150,6 +174,16 @@ button {
 
 button:hover {
     opacity: 0.9;
+}
+
+.submit-row {
+    text-align: center;
+    margin-top: 0.5rem;
+}
+
+.submit-button {
+    padding: 0.85rem 2.75rem;
+    font-size: 1.15rem;
 }
 
 .result {

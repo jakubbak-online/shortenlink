@@ -235,7 +235,7 @@ REST_FRAMEWORK = {
 }
 
 SPECTACULAR_SETTINGS = {
-    "TITLE": "shortenlink API",
+    "TITLE": "skroclinka.pl API",
     "DESCRIPTION": "Skracacz URL z analityką - zarządzanie linkami i statystyki kliknięć.",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
