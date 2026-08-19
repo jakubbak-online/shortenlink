@@ -67,3 +67,25 @@ jobs:
 
       - name: pytest
         run: pytest
+
+  # CD: dopiero po zielonym `test` i tylko na prawdziwym pushu do main
+  # (nie na Pull Requestach - nie deployujemy niedokończonej gałęzi, i
+  # sekrety poniżej i tak nie są dostępne dla workflow odpalanych z PR-a
+  # z forka, ze względów bezpieczeństwa GitHuba).
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Wdrożenie przez SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            cd shortenlink
+            git pull
+            docker compose -f docker-compose.prod.yml up -d --build
