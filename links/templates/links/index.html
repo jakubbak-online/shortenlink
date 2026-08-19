@@ -18,7 +18,32 @@
 
     <form method="post" class="link-form">
         {% csrf_token %}
-        {{ form.as_p }}
+
+        <p>
+            {{ form.target_url.label_tag }}
+            {{ form.target_url }}
+            {{ form.target_url.errors }}
+        </p>
+
+        {# Wszystko poza samym adresem jest tu - hasło, własny kod, wygasanie, #}
+        {# limit kliknięć. Domyślnie zwinięte, bo w 90% przypadków nikt tego #}
+        {# nie dotyka. Otwarte automatycznie, jeśli walidacja czegoś w środku #}
+        {# nie przeszła - inaczej błąd byłby niewidoczny pod zwiniętą listą. #}
+        <details class="advanced-settings" {% if form.errors %}open{% endif %}>
+            <summary>Ustawienia zaawansowane</summary>
+            <div class="advanced-fields">
+                {% for field in form %}
+                    {% if field.name != "target_url" %}
+                        <p>
+                            {{ field.label_tag }}
+                            {{ field }}
+                            {{ field.errors }}
+                        </p>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </details>
+
         <button type="submit">Skróć</button>
     </form>
 {% endblock %}

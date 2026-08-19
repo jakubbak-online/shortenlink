@@ -5,10 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}shortenlink{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <script>
+        // Ciemny jest domyślny (brak klasy = ciemny), więc jedyny przypadek
+        // wymagający działania przed pierwszym malowaniem strony to
+        // zapamiętane "light" - inaczej byłby moment ciemnego tła, zanim
+        // JS na dole strony zdążyłby przełączyć na jasny (flash zmiany
+        // motywu). Stąd ten skrypt jest tu, w <head>, synchronicznie, a
+        // nie w extra_js na dole.
+        if (localStorage.getItem("theme") === "light") {
+            document.documentElement.classList.add("light");
+        }
+    </script>
 </head>
 <body>
     <header class="site-header">
         <a href="{% url 'links:create' %}" class="logo">shortenlink</a>
+        <button type="button" id="theme-toggle" class="theme-toggle" aria-label="Przełącz jasny/ciemny motyw"></button>
     </header>
 
     <main>
@@ -17,7 +29,30 @@
 
     <footer class="site-footer">
         <p>shortenlink — skracacz linków z analityką</p>
+        <p><a href="https://github.com/jakubbak-online/shortenlink">kod źródłowy na GitHubie</a></p>
     </footer>
+
+    <script>
+        (function () {
+            var root = document.documentElement;
+            var toggle = document.getElementById("theme-toggle");
+
+            function isLight() {
+                return root.classList.contains("light");
+            }
+
+            function updateLabel() {
+                toggle.textContent = isLight() ? "Ciemny motyw" : "Jasny motyw";
+            }
+
+            updateLabel();
+            toggle.addEventListener("click", function () {
+                root.classList.toggle("light");
+                localStorage.setItem("theme", isLight() ? "light" : "dark");
+                updateLabel();
+            });
+        })();
+    </script>
 
     {% block extra_js %}{% endblock %}
 </body>

@@ -1,9 +1,30 @@
+/* Ciemny jest domyślną paletą (zgodnie z tym, czego chce większość ludzi
+   klikających w skrócony link o 23:00) - .light na <html> (dopisywane
+   przez JS w base.html) nadpisuje na jasną. */
 :root {
+    --bg: #14151a;
+    --surface: #1c1e24;
+    --text: #e7e8ea;
+    --muted: #9498a3;
+    --accent: #5b8def;
+    --accent-contrast: #ffffff;
+    --border: #2c2e36;
+    --danger: #ff6b6b;
+    --result-bg: #182338;
+    --result-border: #26385c;
+}
+
+:root.light {
     --bg: #f7f7f8;
+    --surface: #ffffff;
     --text: #1b1b1f;
     --muted: #666;
     --accent: #2f6feb;
+    --accent-contrast: #ffffff;
     --border: #ddd;
+    --danger: #c0392b;
+    --result-bg: #eaf1ff;
+    --result-border: #cddcfb;
 }
 
 * {
@@ -16,18 +37,38 @@ body {
     color: var(--text);
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
     line-height: 1.5;
+    transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .site-header {
     padding: 1rem 1.5rem;
     border-bottom: 1px solid var(--border);
-    background: #fff;
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .logo {
     font-weight: 700;
     text-decoration: none;
     color: var(--text);
+}
+
+.theme-toggle {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.theme-toggle:hover {
+    color: var(--text);
+    border-color: var(--muted);
 }
 
 main {
@@ -58,6 +99,8 @@ main {
     padding: 0.6rem 0.75rem;
     border: 1px solid var(--border);
     border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
     font-size: 1rem;
 }
 
@@ -68,9 +111,36 @@ main {
     color: var(--muted);
 }
 
+.advanced-settings {
+    margin: 0.25rem 0 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    transition: border-color 0.15s ease;
+}
+
+.advanced-settings summary {
+    cursor: pointer;
+    padding: 0.6rem 0.9rem;
+    font-size: 0.9rem;
+    color: var(--muted);
+    user-select: none;
+}
+
+.advanced-settings summary:hover {
+    color: var(--text);
+}
+
+.advanced-settings[open] summary {
+    border-bottom: 1px solid var(--border);
+}
+
+.advanced-fields {
+    padding: 1rem 0.9rem 0.25rem;
+}
+
 button {
     background: var(--accent);
-    color: #fff;
+    color: var(--accent-contrast);
     border: none;
     padding: 0.6rem 1.2rem;
     border-radius: 6px;
@@ -83,11 +153,12 @@ button:hover {
 }
 
 .result {
-    background: #eaf1ff;
-    border: 1px solid #cddcfb;
+    background: var(--result-bg);
+    border: 1px solid var(--result-border);
     border-radius: 8px;
     padding: 1rem;
     margin-bottom: 1.5rem;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .result-link {
@@ -103,7 +174,7 @@ button:hover {
 
 .form-error,
 .errorlist {
-    color: #c0392b;
+    color: var(--danger);
     font-size: 0.9rem;
     margin: 0 0 1rem;
     padding-left: 1.1rem;
@@ -148,4 +219,16 @@ h2 {
     color: var(--muted);
     font-size: 0.85rem;
     padding: 2rem 1rem;
+}
+
+.site-footer p {
+    margin: 0.25rem 0;
+}
+
+.site-footer a {
+    color: var(--muted);
+}
+
+.site-footer a:hover {
+    color: var(--text);
 }
