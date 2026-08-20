@@ -1,4 +1,4 @@
-# shortenlink
+# skroclinka.pl
 
 ![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
 ![Django](https://img.shields.io/badge/Django-6.0-092E20?logo=django&logoColor=white)
@@ -8,7 +8,7 @@
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 ![DRF](https://img.shields.io/badge/Django%20REST-Framework-A30000?logo=django&logoColor=white)
 ![pytest](https://img.shields.io/badge/tested%20with-pytest-0A9EDC?logo=pytest&logoColor=white)
-[![CI](https://github.com/jakubbak-online/shortenlink/actions/workflows/ci.yml/badge.svg)](https://github.com/jakubbak-online/shortenlink/actions/workflows/ci.yml)
+[![CI](https://github.com/jakubbak-online/skroclinka.pl/actions/workflows/ci.yml/badge.svg)](https://github.com/jakubbak-online/skroclinka.pl/actions/workflows/ci.yml)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
 *Polska wersja: [README.pl.md](README.pl.md)*
@@ -135,7 +135,7 @@ A full step-by-step walkthrough of every piece in this diagram is in
 ## Project Structure
 
 ```
-shortenlink/
+skroclinka.pl/
 ├── config/                   Django project settings, root URLconf, Celery app
 ├── links/
 │   ├── models.py              Link, ClickEvent, DailyStat
@@ -195,8 +195,8 @@ complete production `.env` in one command (random `SECRET_KEY` and
 Python install needed.
 
 ```bash
-git clone https://github.com/jakubbak-online/shortenlink.git
-cd shortenlink
+git clone https://github.com/jakubbak-online/skroclinka.pl.git
+cd skroclinka.pl
 cp .env.example .env      # fill in SECRET_KEY and IP_SALT, see above
 docker compose up
 ```

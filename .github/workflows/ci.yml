@@ -86,6 +86,6 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
             set -e
-            cd shortenlink
+            cd skroclinka.pl
             git pull
             docker compose -f docker-compose.prod.yml up -d --build
